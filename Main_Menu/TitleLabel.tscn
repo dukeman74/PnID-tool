@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://bcqpwgf4afkl4"]
+
+[node name="Label" type="Label"]
+offset_left = 568.0
+offset_top = 304.0
+offset_right = 646.0
+offset_bottom = 330.0
+text = "PnID Tool"

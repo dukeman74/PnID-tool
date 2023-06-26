@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://b1em7gwfpabap"]
+
+[node name="Button" type="Button"]
+offset_left = 65.0
+offset_top = 32.0
+offset_right = 177.0
+offset_bottom = 63.0
+text = "<Place Holder Text>"
