@@ -8,7 +8,7 @@ var page_pos:Vector2=Vector2(500,200)
 var page_dimensions:Vector2 = Vector2(1100,700)
 var zoom:float=1
 var zoom_min:float=0.1
-var zoom_max:float=5
+var zoom_max:float=20
 var zoom_mod:float=0.1
 var holding:bool=false
 var holding_position:Vector2
@@ -103,10 +103,10 @@ func get_offset_from_node(node):
 
 func safe_draw_line(line):
 	var abovinator:Vector2=Vector2(0,5)
-	var pos1:Vector2=line.node1.pos*zoom+line.node1.sprite.position
-	var pos2:Vector2=line.node2.pos*zoom+line.node2.sprite.position
-	var abovepos1:Vector2=pos1+get_offset_from_node(line.node1)*zoom
-	var abovepos2:Vector2=pos2+get_offset_from_node(line.node2)*zoom
+	var pos1:Vector2=line.node1.pos+line.node1.sprite.pos
+	var pos2:Vector2=line.node2.pos+line.node2.sprite.pos
+	var abovepos1:Vector2=pos1+get_offset_from_node(line.node1)
+	var abovepos2:Vector2=pos2+get_offset_from_node(line.node2)
 	var higher:bool=true
 	if(abovepos1.y<abovepos2.y):
 		higher=false
@@ -131,7 +131,7 @@ func prepare_draw():
 		
 		
 func second_pass(depth:int):
-	if(depth>100):
+	if(depth<100):
 		return
 	var sprite_padding=4
 	var sp1:Vector2
@@ -161,9 +161,9 @@ func second_pass(depth:int):
 					rightest=point.x
 					for sprite in sprites:
 						sp1=sprite.position
-						sp3=sprite.position+sprite.texture.get_size()*zoom
-						sp2=sprite.position+Vector2(sprite.texture.get_size().x*zoom,0)
-						sp4=sprite.position+Vector2(0,sprite.texture.get_size().y*zoom)
+						sp3=sprite.position+sprite.texture.get_size()
+						sp2=sprite.position+Vector2(sprite.texture.get_size().x,0)
+						sp4=sprite.position+Vector2(0,sprite.texture.get_size().y)
 						
 						if((sp1.y<point.y and sp3.y>point.y) or (sp1.y<lastpt.y and sp3.y>lastpt.y)):
 							continue
@@ -220,16 +220,19 @@ func _draw():
 		var deep_last
 		var intersect_points:Array[Vector2]
 		var intersect_point
+		var multibreak1:Vector2
+		var multibreak2:Vector2
 		for point in vector_vector:
 			if(last!=null):
 				if(last.y==point.y):
-					draw_line(last,point,Color.BLACK)
+					draw_line(last*zoom+page_pos,point*zoom+page_pos,Color.BLACK)
 				else:
 					intersect_points=[]
 					for deep_vector_vector in vector_vector_vector:
 						if(deep_vector_vector==vector_vector):
 							if(len(vector_vector_vector) == 1):
-								draw_line(last,point,Color.BLACK)
+								var a=1
+								#draw_line(last,point,Color.BLACK)
 							continue
 						deep_last=null
 						for deep_point in deep_vector_vector:
@@ -239,7 +242,7 @@ func _draw():
 									intersect_points.push_back(intersect_point)
 							deep_last=deep_point
 					if(len(intersect_points)==0):
-						draw_line(last,point,Color.BLACK)
+						draw_line(last*zoom+page_pos,point*zoom+page_pos,Color.BLACK)
 					else:
 						var higher:bool=true
 						if(last.y>point.y):
@@ -252,11 +255,33 @@ func _draw():
 						var pt1:Vector2=last
 						var break_point_nl2=intersect_points.back()
 						var break_point_nl=intersect_points.pop_front()
-						draw_line(pt1,break_point_nl+add_vec,Color.BLACK)
-						draw_line(point,break_point_nl2-add_vec,Color.BLACK)
+						
+						#check to make sure that lines don't get drawn stupidly at this zoom level
+						var p1test:Vector2=pt1*zoom+page_pos
+						var p2test:Vector2=break_point_nl*zoom+page_pos +add_vec
+						
+						var p3test:Vector2=point*zoom+page_pos
+						var p4test:Vector2=break_point_nl2*zoom+page_pos -add_vec
+						
+						var l1good:bool=!higher
+						var l2good:bool=!higher
+						if(p1test<p2test):
+							l1good=!l1good
+						if(p3test>p4test):
+							l2good=!l2good
+						if(l1good):
+							draw_line(p1test,p2test,Color.BLACK)
+						if(l2good):
+							draw_line(p3test,p4test,Color.BLACK)
 						pt1=break_point_nl
 						for break_point in intersect_points:
-							draw_line(pt1-add_vec,break_point+add_vec,Color.BLACK)
+							multibreak1=pt1*zoom+page_pos -add_vec
+							multibreak2=break_point*zoom+page_pos +add_vec
+							l1good=!higher
+							if(multibreak1<multibreak2):
+								l1good=!l1good
+							if(l1good):
+								draw_line(multibreak1,multibreak2,Color.BLACK)
 							pt1=break_point
 			last=point
 		
