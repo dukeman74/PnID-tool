@@ -2,6 +2,8 @@ class_name control extends Node2D
 
 @export var sprite_class : PackedScene
 @export var connection_class : PackedScene
+@export var state_scene : PackedScene
+@export var node_scene : PackedScene
 @export var elixer_tex : Texture
 
 var page_pos:Vector2=Vector2(500,200)
@@ -13,17 +15,92 @@ var zoom_mod:float=0.1
 var holding:bool=false
 var holding_position:Vector2
 var sprites:Array[Sprite_class] = []
-var nodes_dict:Dictionary = {}
 var connections:Dictionary = {}
 var mouse_pos:Vector2
 var bruh:Node_connection=null
 var vector_vector_vector
+var edit_list:Array[state_class]=[]
+var undo_list:Array[state_class]=[]
+
+func save_state():
+	var this_state=state_scene.instantiate()
+	sprite_copy(self,this_state)
+	return(this_state)
+	
+func sprite_copy(source_obj,destination_obj):
+	var source_array:Array[Sprite_class]=source_obj.sprites
+	var destination_array:Array[Sprite_class]=destination_obj.sprites
+	var dupe_sprite:Sprite_class
+	var dupe_conncetion
+	var i:int
+	var dupe_node
+	var node_translation:Dictionary={null:null}
+	for sprite in source_array:
+		dupe_sprite=sprite_class.instantiate()
+		dupe_sprite.pos=Vector2(sprite.pos.x,sprite.pos.y)
+		dupe_sprite.texture=sprite.texture
+		for node in sprite.nodes:
+			dupe_sprite.add_node(Vector2(node.pos.x,node.pos.y))
+			if(node.attatched!=null):
+				dupe_node=dupe_sprite.nodes.back()
+				node_translation[node]=dupe_node
+			
+		destination_array.push_back(dupe_sprite)
+	for connection in source_obj.connections:
+		dupe_conncetion=connection_class.instantiate()
+		dupe_conncetion.node1=node_translation[connection.node1]
+		dupe_conncetion.node2=node_translation[connection.node2]
+		destination_obj.connections[dupe_conncetion]=true
+		if(dupe_conncetion.node1!=null):
+			dupe_conncetion.node1.attatched=dupe_conncetion
+			dupe_conncetion.node2.attatched=dupe_conncetion
+func undo():
+	undo_list.push_front(edit_list.pop_back())
+	load_state(edit_list.back())
+	
+	
+func load_state(new_state):
+	for sprite in sprites:
+		sprite.free()
+	sprites=[]
+	connections={}
+	sprite_copy(new_state,self)
+	for sprite in sprites:
+		sprite.parent=self
+		add_child(sprite)
+		sprite.scale=Vector2(zoom,zoom)
+		
+		
+	
+	edit_redraw()
+
+func redo():
+	var new_state=undo_list.pop_front()
+	edit_list.push_back(new_state)
+	load_state(new_state)
+	
+	
+func register_edit():
+	undo_list=[]
+	edit_list.push_back(save_state())
+	
+	edit_redraw()
+
+func edit_redraw():
+	prepare_draw()
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	register_edit()
 	pass # Replace with function body.
 
 func _input(event):
+	if event.is_action_pressed("undo"):
+		if(len(edit_list)==1): return
+		undo()
+	if event.is_action_pressed("redo"):
+		if(len(undo_list)==0): return
+		redo()
 	if event.is_action_pressed("scroll_up"):
 		zoom_change(zoom_mod)
 	if event.is_action_pressed("scroll_down"):
@@ -34,6 +111,9 @@ func _input(event):
 		this_sprite.scale=Vector2(zoom,zoom)
 		add_child(this_sprite)
 		sprites.push_back(this_sprite)
+		this_sprite.add_node(Vector2(16,2))
+		this_sprite.parent=self
+		register_edit()
 	if event.is_action_pressed("key_9"):
 		var this_sprite=sprite_class.instantiate()
 		this_sprite.position=Vector2(200,200)
@@ -41,7 +121,10 @@ func _input(event):
 		add_child(this_sprite)
 		sprites.push_back(this_sprite)
 		this_sprite.texture=elixer_tex
+		this_sprite.add_node(Vector2(16,2))
 		this_sprite.add_node(Vector2(16,30))
+		this_sprite.parent=self
+		register_edit()
 	
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta):
@@ -81,6 +164,7 @@ func click_node(node):
 		victim_con.node2.attatched=null
 		connections.erase(victim_con)
 		victim_con.free()
+		register_edit()
 		return
 	if(bruh==null):
 		bruh=node
@@ -92,7 +176,7 @@ func click_node(node):
 		bruh.attatched=new_con
 		bruh=null
 		connections[new_con]=true
-		
+		register_edit()
 
 func get_offset_from_node(node):
 	var off_length=5
@@ -129,11 +213,11 @@ func prepare_draw():
 		safe_draw_line(line)
 	second_pass(0)
 		
-		
 func second_pass(depth:int):
-	if(depth<100):
+	if(depth>10):
+		print("can't find working path")
 		return
-	var sprite_padding=4
+	var sprite_padding=1
 	var sp1:Vector2
 	var sp2:Vector2
 	var sp3:Vector2
@@ -150,56 +234,139 @@ func second_pass(depth:int):
 	var point
 	var good:bool=true
 	var ignore_thresh=4
+	var epsilon:float=0.0001
 	for vector_vector in vector_vector_vector:
 		lastpt=null
 		i=0
-		while(i<len(vector_vector)):
+		while(i<len(vector_vector)-1):
 			point=vector_vector[i]
 			if(lastpt!=null):
-				if(point.x==lastpt.x):
-					leftest=point.x
-					rightest=point.x
-					for sprite in sprites:
-						sp1=sprite.position
-						sp3=sprite.position+sprite.texture.get_size()
-						sp2=sprite.position+Vector2(sprite.texture.get_size().x,0)
-						sp4=sprite.position+Vector2(0,sprite.texture.get_size().y)
-						
-						if((sp1.y<point.y and sp3.y>point.y) or (sp1.y<lastpt.y and sp3.y>lastpt.y)):
+				var goalc:float
+				var startc:float
+				var lastleft:float
+				var lastright:float
+				var testc:float
+				var loops:int=0
+				var c1:float
+				var c2:float
+				var test_point1:Vector2
+				var test_point2:Vector2
+				var rscore:float
+				var lscore:float
+				var vertical:bool
+				if(point.x==lastpt.x): #vertical version
+					vertical=true
+					c1=point.y
+					c2=lastpt.y
+					testc=point.x
+					startc=point.x
+					if(lastpt.y<point.y):
+						goalc=vector_vector[i-2].x
+					else:
+						goalc=vector_vector[i+1].x
+				else: #horizontal version
+					lastpt=point
+					i+=1
+					continue # this no work good
+					vertical=false
+					c1=point.x
+					c2=lastpt.x
+					testc=point.y
+					startc=point.y
+					if(lastpt.x<point.x):
+						goalc=vector_vector[i-2].y
+					else:
+						goalc=vector_vector[i+1].y
+				leftest=testc
+				rightest=testc
+				while(true):
+					if(loops>1000):
+						print("no valid line pathing - big sad")
+						break
+					lastleft=leftest
+					lastright=rightest
+					for sprite in sprites: #test all the sprites for hitting testc
+						sp1=sprite.pos
+						sp3=sprite.pos+sprite.texture.get_size()
+						sp2=sprite.pos+Vector2(sprite.texture.get_size().x,0)
+						sp4=sprite.pos+Vector2(0,sprite.texture.get_size().y)
+						var npos:Vector2
+						var breakout:bool=false
+						for node in sprite.nodes:
+							npos=node.pos+sprite.pos
+							var a=npos.distance_to(point)
+							var b=npos.distance_to(lastpt)
+							if(a<epsilon or b<epsilon):
+								breakout=true
+								break
+						if(breakout):
 							continue
+						#if((sp1.y<point.y and sp3.y>point.y) or (sp1.y<lastpt.y and sp3.y>lastpt.y)):
+							#continue
 						#if(abs(sp1.y-point.y)<ignore_thresh or abs(sp1.y-lastpt.y)<ignore_thresh or abs(sp3.y-point.y)<ignore_thresh or abs(sp3.y-lastpt.y)<ignore_thresh):
 							#continue
 						sp1-=Vector2(sprite_padding,sprite_padding)
 						sp3+=Vector2(sprite_padding,sprite_padding)
 						sp2+=Vector2(sprite_padding,-sprite_padding)
 						sp4+=Vector2(-sprite_padding,sprite_padding)
-						
-						hit=Geometry2D.segment_intersects_segment(point,lastpt,sp1,sp2)
-						hit2=Geometry2D.segment_intersects_segment(point,lastpt,sp3,sp4)
-						if(hit!=null or hit2!=null):
-							thisr=sp2.x+1
-							thisl=sp1.x-1
+						if(vertical):
+							test_point1=Vector2(testc,c1)
+							test_point2=Vector2(testc,c2)
+							hit=Geometry2D.segment_intersects_segment(test_point1,test_point2,sp1,sp2)
+							hit2=Geometry2D.segment_intersects_segment(test_point1,test_point2,sp3,sp4)
+							if(hit!=null or hit2!=null):
+								thisr=sp2.x+1
+								thisl=sp1.x-1
+							else:
+								continue
 						else:
-							continue
+							test_point1=Vector2(c1,testc)
+							test_point2=Vector2(c2,testc)
+							hit=Geometry2D.segment_intersects_segment(test_point1,test_point2,sp1,sp4)
+							hit2=Geometry2D.segment_intersects_segment(test_point1,test_point2,sp2,sp3)
+							if(hit!=null or hit2!=null):
+								thisr=sp3.y+1
+								thisl=sp1.y-1
+							else:
+								continue
 						if(thisr>rightest):
 							rightest=thisr
 						if(thisl<leftest):
 							leftest=thisl
-					if(leftest!=point.x or rightest!=point.x):
-						if(abs(point.x-leftest) > abs(rightest-point.x)):
-							newpt=Vector2(rightest,point.y)
+					if(leftest!=lastleft or rightest!=lastright):
+						lscore=abs(goalc-leftest)+abs(startc-leftest)
+						rscore=abs(goalc-rightest)+abs(startc-rightest)
+						if(lscore > rscore):
+							testc=rightest
 						else:
-							newpt=Vector2(leftest,point.y)
-						#splice in newpt between lastpt and the next one
-						if(lastpt.y<point.y):
+							testc=leftest
+					else:
+						break
+						
+					
+				if(testc!=startc):
+					if(vertical):
+						newpt=Vector2(testc,point.y)
+					else:
+						newpt=Vector2(point.x,testc)
+					#splice in newpt between lastpt and the next one
+					if(c2<c1):
+						if(vertical):
 							vector_vector[i-1].x=newpt.x
-							vector_vector.insert(i,newpt)
 						else:
+							vector_vector[i-1].y=newpt.y
+						vector_vector.insert(i,newpt)
+					else:
+						if(vertical):
 							vector_vector[i].x=newpt.x
 							vector_vector.insert(i,Vector2(newpt.x,lastpt.y))
-						good=false
-						break
-						#break out of this and call self again hoping it is valid this time
+						else:
+							vector_vector[i].y=newpt.y
+							vector_vector.insert(i,Vector2(lastpt.x,newpt.y))
+						
+					good=false
+					break
+					#break out of this and call self again hoping it is valid this time
 			lastpt=point
 			i+=1
 		if(!good):
@@ -213,7 +380,6 @@ func _draw():
 	draw_rect(Rect2(page_pos,page_dimensions*zoom),Color.ANTIQUE_WHITE)
 	if(bruh):
 		draw_line(bruh.pos*zoom+bruh.sprite.position,get_viewport().get_mouse_position(),Color.LAWN_GREEN)
-	prepare_draw()
 	
 	for vector_vector in vector_vector_vector:
 		var last=null
@@ -285,8 +451,20 @@ func _draw():
 							pt1=break_point
 			last=point
 		
-		
-	
+	#draw edit history
+	var dx:int=100
+	var width:int=40
+	var padding:int=5
+	var dy:int=20
+	for who_cares in edit_list:
+		draw_rect(Rect2(dx,dy,width,width),Color.NAVY_BLUE)
+		dx+=width+padding
+	dx-=width+padding
+	draw_rect(Rect2(dx-1,dy-1,width+2,width+2),Color.GHOST_WHITE,false)
+	dx+=width+padding
+	for who_cares in undo_list:
+		draw_rect(Rect2(dx,dy,width,width),Color.SLATE_GRAY)
+		dx+=width+padding
 
 
 

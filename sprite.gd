@@ -14,8 +14,6 @@ var left_click:bool=false
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	add_node(Vector2(16,2))
-	parent=get_parent()
 	pass # Replace with function body.
 
 func add_node(coords:Vector2):
@@ -63,9 +61,10 @@ func _process(_delta):
 	if Input.is_mouse_button_pressed(1):
 		var newpos:Vector2 = parent.mouse_pos
 		pos = newpos-grab_pos
+		parent.edit_redraw()
 	else:
 		holding=false
-	pass
+		parent.register_edit()
 
 func _input(event):
 	if(!moused):
