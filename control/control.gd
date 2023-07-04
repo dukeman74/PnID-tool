@@ -5,6 +5,7 @@ class_name control extends Node2D
 @export var state_scene : PackedScene
 @export var node_scene : PackedScene
 @export var elixer_tex : Texture
+@export var selection_arrow : Texture
 
 var page_pos:Vector2=Vector2(500,200)
 var page_dimensions:Vector2 = Vector2(1100,700)
@@ -21,6 +22,12 @@ var bruh:Node_connection=null
 var vector_vector_vector
 var edit_list:Array[state_class]=[]
 var undo_list:Array[state_class]=[]
+var selection = null
+var clicked_well:bool
+
+enum state {normal,line_drawing}
+
+var current_state:state=state.normal
 
 func save_state():
 	var this_state=state_scene.instantiate()
@@ -54,12 +61,13 @@ func sprite_copy(source_obj,destination_obj):
 		if(dupe_conncetion.node1!=null):
 			dupe_conncetion.node1.attatched=dupe_conncetion
 			dupe_conncetion.node2.attatched=dupe_conncetion
+
 func undo():
 	undo_list.push_front(edit_list.pop_back())
 	load_state(edit_list.back())
 	
-	
 func load_state(new_state):
+	selection=null
 	for sprite in sprites:
 		sprite.free()
 	sprites=[]
@@ -78,8 +86,7 @@ func redo():
 	var new_state=undo_list.pop_front()
 	edit_list.push_back(new_state)
 	load_state(new_state)
-	
-	
+		
 func register_edit():
 	undo_list=[]
 	edit_list.push_back(save_state())
@@ -125,9 +132,13 @@ func _input(event):
 		this_sprite.add_node(Vector2(16,30))
 		this_sprite.parent=self
 		register_edit()
+	if event.is_action_pressed("left_click"):
+		if(!clicked_well):
+			selection=null
 	
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta):
+	clicked_well=false
 	mouse_pos=mouse_in_terms_of_page()
 	if Input.is_mouse_button_pressed(3):
 		if(!holding):
@@ -166,9 +177,10 @@ func click_node(node):
 		victim_con.free()
 		register_edit()
 		return
-	if(bruh==null):
+	if(current_state==state.normal):
 		bruh=node
-	else:
+		current_state=state.line_drawing
+	elif(current_state==state.line_drawing):
 		var new_con=connection_class.instantiate()
 		new_con.node1=bruh
 		new_con.node2=node
@@ -176,6 +188,7 @@ func click_node(node):
 		bruh.attatched=new_con
 		bruh=null
 		connections[new_con]=true
+		current_state=state.normal
 		register_edit()
 
 func get_offset_from_node(node):
@@ -378,7 +391,7 @@ func sort_by_y(homie:Vector2,brosef:Vector2):
 
 func _draw():
 	draw_rect(Rect2(page_pos,page_dimensions*zoom),Color.ANTIQUE_WHITE)
-	if(bruh):
+	if(current_state==state.line_drawing):
 		draw_line(bruh.pos*zoom+bruh.sprite.position,get_viewport().get_mouse_position(),Color.LAWN_GREEN)
 	
 	for vector_vector in vector_vector_vector:
@@ -466,6 +479,10 @@ func _draw():
 		draw_rect(Rect2(dx,dy,width,width),Color.SLATE_GRAY)
 		dx+=width+padding
 
+	#draw selected arrow
+	if(selection!=null):
+		var selec_pos=selection.pos
+		draw_texture(selection_arrow,selec_pos*zoom+page_pos+Vector2(selection.texture.get_size().x/2 * zoom-10,-25))
 
 
 
