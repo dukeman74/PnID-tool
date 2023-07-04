@@ -1,0 +1,18 @@
+[gd_scene load_steps=8 format=3 uid="uid://c42oi3sxh26bf"]
+
+[ext_resource type="Script" path="res://control/control.gd" id="1_7lo64"]
+[ext_resource type="PackedScene" uid="uid://bil181d2afr2q" path="res://sprite/sprite.tscn" id="2_p6kjb"]
+[ext_resource type="PackedScene" uid="uid://dp8w6dipv37vr" path="res://connection/connection.tscn" id="3_k1d4u"]
+[ext_resource type="PackedScene" uid="uid://blkht153y62ny" path="res://state/state.tscn" id="4_lrmhl"]
+[ext_resource type="PackedScene" path="res://node/node.tscn" id="5_bbxq1"]
+[ext_resource type="Texture2D" uid="uid://du4rem76x3gjy" path="res://icons/elixer_pump.png" id="6_x66e1"]
+[ext_resource type="Texture2D" uid="uid://ddl33al6grne2" path="res://icons/selection arrow.png" id="7_ehwdk"]
+
+[node name="control" type="Node2D"]
+script = ExtResource("1_7lo64")
+sprite_class = ExtResource("2_p6kjb")
+connection_class = ExtResource("3_k1d4u")
+state_scene = ExtResource("4_lrmhl")
+node_scene = ExtResource("5_bbxq1")
+elixer_tex = ExtResource("6_x66e1")
+selection_arrow = ExtResource("7_ehwdk")

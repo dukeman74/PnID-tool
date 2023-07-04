@@ -25,20 +25,25 @@ func add_node(coords:Vector2):
 func _draw():
 	position=pos*parent.zoom+parent.page_pos
 	var draw_hover=true
-	var color
+	var color:Color
+	var defcolor:Color=Color.CORNFLOWER_BLUE
+	if(parent.current_state==parent.state.line_drawing):
+		defcolor=Color.YELLOW
 	for node in nodes:
-		color=Color.CORNFLOWER_BLUE
+		if(parent.bruh==node):
+			continue
+		color=defcolor
 		if(node.attatched!=null):
 			color=Color.BLACK
 		var this_pos=node.pos#parent.zoom
-		if((this_pos*parent.zoom+position).distance_to(get_viewport().get_mouse_position())<2*parent.zoom):
+		if(((parent.selection==self and parent.current_state==parent.state.normal) or (parent.current_state==parent.state.line_drawing and node!=parent.bruh)) and (this_pos*parent.zoom+position).distance_to(get_viewport().get_mouse_position())<2*parent.zoom):
 			draw_hover=false
 			color=Color.AQUA
 			if(node.attatched!=null):
 				color=Color.RED
 			if(left_click):
 				parent.click_node(node)
-		
+			
 		draw_circle(this_pos,2,color)
 		
 	#draw_texture(tex,position)
@@ -48,8 +53,11 @@ func _draw():
 	elif(draw_hover and moused):
 		draw_rect(Rect2(Vector2(0,0),texture.get_size()),Color.AQUA,false)
 		if(left_click):
-			holding=true
-			grab_pos=parent.mouse_pos-pos
+			if(parent.selection==self):
+				holding=true
+				grab_pos=parent.mouse_pos-pos
+			parent.selection=self
+			
 	left_click=false
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -71,10 +79,11 @@ func _input(event):
 		return
 	if(event.is_action_pressed("left_click")):
 		left_click=true
+		parent.clicked_well=true
 	if(event.is_action_pressed("right_click")):
+		return
 		holding=true
 		grab_pos=parent.mouse_pos-pos
-	pass
 
 func _on_mouse_exited():
 	moused=false
